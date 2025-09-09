@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<title>Snake Game - Dog Edition</title>
+	<link rel="stylesheet" href="snake.css">
+</head>
+<body>
+	<nav class="navbar">
+		<ul>
+			<li><a href="index.html">Home</a></li>
+<!--
+			<li><a href="kingston.html">Kingston</a></li>
+-->
+			<li><a href="gallery.html">Gallery</a></li>
+<!--
+			<li><a href="letters.html">Letters</a></li>
+-->
+			<li><a href="snake.html">Snake Game</a></li>
+		</ul>
+	</nav>
+	<main>
+		<h1></h1>
+		<div class="snake-game-container">
+			<canvas id="snake-canvas" width="400" height="400"></canvas>
+			<div id="score">Score: 0</div>
+			<div id="game-over" style="display:none;">Game Over! Press Space to Restart.</div>
+		</div>
+	</main>
+	<script>
+	// --- Snake Game with Dog Segments ---
+	const canvas = document.getElementById('snake-canvas');
+	const ctx = canvas.getContext('2d');
+	const box = 32; // size of each grid square (increased for larger dog)
+	let snake = [ {x: 9, y: 10} ];
+	let direction = 'RIGHT';
+	let nextDirection = 'RIGHT';
+	let food = randomFood();
+	let score = 0;
+	let gameInterval = null;
+	let gameOver = false;
+
+	function randomFood() {
+		return {
+			x: Math.floor(Math.random() * (canvas.width/box)),
+			y: Math.floor(Math.random() * (canvas.height/box))
+		};
+	}
+
+	function drawDog(x, y, isHead) {
+		// Draw a larger white dog with brown ears (side view, no rotation)
+		const px = x * box;
+		const py = y * box;
+		// Body
+		ctx.fillStyle = '#fff';
+		ctx.fillRect(px + 4, py + box * 0.45, box - 8, box * 0.5);
+		// Head
+		ctx.beginPath();
+		ctx.arc(px + box / 2, py + box * 0.45, box * 0.32, 0, Math.PI * 2);
+		ctx.fillStyle = '#fff';
+		ctx.fill();
+		// Ears (only for head)
+		if (isHead) {
+			ctx.fillStyle = '#8B5C2A';
+			ctx.beginPath();
+			ctx.ellipse(px + box * 0.22, py + box * 0.32, box * 0.13, box * 0.22, Math.PI / 6, 0, Math.PI * 2);
+			ctx.fill();
+			ctx.beginPath();
+			ctx.ellipse(px + box * 0.78, py + box * 0.32, box * 0.13, box * 0.22, -Math.PI / 6, 0, Math.PI * 2);
+			ctx.fill();
+			// Eyes
+			ctx.fillStyle = '#222';
+			ctx.beginPath();
+			ctx.arc(px + box / 2 - box * 0.13, py + box * 0.41, box * 0.06, 0, Math.PI * 2);
+			ctx.arc(px + box / 2 + box * 0.13, py + box * 0.41, box * 0.06, 0, Math.PI * 2);
+			ctx.fill();
+			// Nose
+			ctx.beginPath();
+			ctx.arc(px + box / 2, py + box * 0.48, box * 0.07, 0, Math.PI * 2);
+			ctx.fillStyle = '#444';
+			ctx.fill();
+		}
+	}
+
+	function drawFood(x, y) {
+		// Draw a bone for food, scaled up
+		const px = x * box + box / 2;
+		const py = y * box + box / 2;
+		ctx.save();
+		ctx.translate(px, py);
+		ctx.rotate(Math.PI / 8);
+		ctx.fillStyle = '#fff';
+		ctx.fillRect(-box * 0.22, -box * 0.09, box * 0.44, box * 0.18);
+		ctx.beginPath();
+		ctx.arc(-box * 0.25, -box * 0.09, box * 0.13, 0, Math.PI * 2);
+		ctx.arc(-box * 0.25, box * 0.09, box * 0.13, 0, Math.PI * 2);
+		ctx.arc(box * 0.25, -box * 0.09, box * 0.13, 0, Math.PI * 2);
+		ctx.arc(box * 0.25, box * 0.09, box * 0.13, 0, Math.PI * 2);
+		ctx.fillStyle = '#e2c48d';
+		ctx.fill();
+		ctx.restore();
+	}
+
+	function draw() {
+		ctx.clearRect(0, 0, canvas.width, canvas.height);
+		// Draw connecting rectangles between segments
+		for (let i = 1; i < snake.length; i++) {
+			const prev = snake[i - 1];
+			const curr = snake[i];
+			// If adjacent, draw a connecting rectangle
+			if (Math.abs(prev.x - curr.x) + Math.abs(prev.y - curr.y) === 1) {
+				let x = Math.min(prev.x, curr.x);
+				let y = Math.min(prev.y, curr.y);
+				let w = box;
+				let h = box;
+				if (prev.x === curr.x) {
+					// Vertical connection
+					y = Math.min(prev.y, curr.y) * box + box * 0.7;
+					x = curr.x * box + 4;
+					w = box - 8;
+					h = box * 0.6;
+				} else {
+					// Horizontal connection
+					x = Math.min(prev.x, curr.x) * box + 4;
+					y = curr.y * box + box * 0.45;
+					w = box * 2 - 8;
+					h = box * 0.5;
+				}
+				ctx.fillStyle = '#fff';
+				ctx.fillRect(x, y, w, h);
+			}
+		}
+		// Draw snake: head is dog, body is blocky
+		for (let i = 0; i < snake.length; i++) {
+			if (i === 0) {
+				drawDog(snake[i].x, snake[i].y, true);
+			} else {
+				// Draw blocky body segment
+				const px = snake[i].x * box;
+				const py = snake[i].y * box;
+				ctx.fillStyle = '#fff';
+				ctx.fillRect(px + 4, py + box * 0.45, box - 8, box * 0.5);
+			}
+		}
+		// Draw food
+		drawFood(food.x, food.y);
+		// Draw score
+		document.getElementById('score').textContent = 'Score: ' + score;
+	}
+
+	function moveSnake() {
+		let head = { ...snake[0] };
+		direction = nextDirection;
+		if (direction === 'LEFT') head.x--;
+		if (direction === 'UP') head.y--;
+		if (direction === 'RIGHT') head.x++;
+		if (direction === 'DOWN') head.y++;
+
+		// Wall collision
+		if (head.x < 0 || head.x >= canvas.width/box || head.y < 0 || head.y >= canvas.height/box) {
+			endGame();
+			return;
+		}
+		// Self collision
+		for (let i = 0; i < snake.length; i++) {
+			if (head.x === snake[i].x && head.y === snake[i].y) {
+				endGame();
+				return;
+			}
+		}
+		// Food collision
+		if (head.x === food.x && head.y === food.y) {
+			snake.unshift(head);
+			score++;
+			food = randomFood();
+		} else {
+			snake.unshift(head);
+			snake.pop();
+		}
+		draw();
+	}
+
+	function endGame() {
+		clearInterval(gameInterval);
+		gameOver = true;
+		document.getElementById('game-over').style.display = 'block';
+	}
+
+	function restartGame() {
+		snake = [ {x: 9, y: 10} ];
+		direction = 'RIGHT';
+		nextDirection = 'RIGHT';
+		food = randomFood();
+		score = 0;
+		gameOver = false;
+		document.getElementById('game-over').style.display = 'none';
+		draw();
+		gameInterval = setInterval(moveSnake, 120);
+	}
+
+	document.addEventListener('keydown', function(e) {
+		if (e.key === 'ArrowLeft' && direction !== 'RIGHT') nextDirection = 'LEFT';
+		if (e.key === 'ArrowUp' && direction !== 'DOWN') nextDirection = 'UP';
+		if (e.key === 'ArrowRight' && direction !== 'LEFT') nextDirection = 'RIGHT';
+		if (e.key === 'ArrowDown' && direction !== 'UP') nextDirection = 'DOWN';
+		if (gameOver && e.code === 'Space') restartGame();
+	});
+
+	// Initial draw and start
+	draw();
+	gameInterval = setInterval(moveSnake, 120);
+	</script>
+</body>
+</html>
